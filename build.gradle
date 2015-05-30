@@ -1,0 +1,84 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'jacoco'
+apply plugin: 'spring-boot'
+
+idea {
+    module {
+        inheritOutputDirs = false
+        outputDir = file("$buildDir/classes/main/")
+    }
+}
+
+buildscript {
+    ext {
+        springBootVersion = '1.2.3.RELEASE'
+    }
+    repositories {
+        maven {
+            url 'http://repo.spring.io/plugins-release'
+        }
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+        classpath "org.springframework:springloaded:${springBootVersion}"
+
+    }
+}
+
+def patchVersion = System.getenv("GO_PIPELINE_COUNTER")
+def buildVersion = patchVersion ? ('1.1.' + patchVersion) : '1.1'
+
+jar {
+    baseName = 'AuthService'
+    version = buildVersion
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile("org.springframework.boot:spring-boot-starter-web")
+    compile('org.springframework.boot:spring-boot-starter-actuator')
+    compile('org.springframework.boot:spring-boot-starter-security')
+    compile('org.springframework.amqp:spring-rabbit:1.4.3.RELEASE')
+
+    compile('com.google.guava:guava:18.0')
+    compile('org.projectlombok:lombok:1.14.8')
+    compile('ch.qos.logback:logback-core:1.1.2')
+    compile('net.logstash.logback:logstash-logback-encoder:3.4')
+    compile('commons-lang:commons-lang:2.6')
+    compile('com.squareup.okhttp:okhttp:2.2.0')
+    testCompile('org.springframework.boot:spring-boot-starter-test')
+    testCompile('com.squareup.okhttp:mockwebserver:2.2.0')
+}
+
+jacocoTestReport {
+    group = "Reporting"
+    description = "Generate coverage report"
+    additionalSourceDirs = files(sourceSets.main.allJava.srcDirs)
+    reports {
+        xml.enabled false
+        csv.enabled false
+        html.destination "${buildDir}/jacocoHtml"
+    }
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.2.1'
+}
+
+test {
+    def activeProfile = System.getenv("spring_profiles_active")
+    if (activeProfile == null || activeProfile == "") {
+        systemProperties 'spring.profiles.active': 'test'
+    }
+}
+
+jar.doFirst {
+    def buildInfoFile = "build/resources/main/BUILD_INFO"
+    delete(buildInfoFile)
+    file(buildInfoFile) << "{\"VERSION\": \"${buildVersion}\"}"
+}
